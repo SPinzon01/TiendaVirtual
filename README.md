@@ -23,7 +23,7 @@ npm install
 ### Ejecución
 
 ```bash
-node run dev
+npm run dev
 ```
 
 El backend corre por defecto en [http://localhost:4000](http://localhost:4000).
