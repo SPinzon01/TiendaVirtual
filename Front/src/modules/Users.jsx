@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { Table, Card, Typography, Divider, message, Layout, Button, Popconfirm } from "antd";
+import {
+  Table,
+  Card,
+  Typography,
+  Divider,
+  message,
+  Layout,
+  Button,
+  Popconfirm,
+  Modal,
+  Form,
+  Input,
+} from "antd";
 import axios from "axios";
 import AppHeader from "../layout/LayoutHeader";
 import AppFooter from "../layout/LayoutFooter";
@@ -10,6 +22,9 @@ const { Content } = Layout;
 function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [form] = Form.useForm();
 
   const user = JSON.parse(localStorage.getItem("user"));
   const username = user?.nombre || "";
@@ -35,7 +50,7 @@ function UserManagement() {
     try {
       await axios.delete(`http://localhost:4000/api/usuarios/${id}`);
       message.success("Usuario eliminado correctamente");
-      setUsers(users.filter((user) => user.id !== id));
+      setUsers(users.filter((u) => u.id !== id));
     } catch (err) {
       message.error("Error al eliminar el usuario");
       console.error(err);
@@ -44,16 +59,48 @@ function UserManagement() {
     }
   };
 
+  const openEditModal = (record) => {
+    setEditingUser(record);
+    form.setFieldsValue({
+      nombre: record.nombre,
+      apellido: record.apellido,
+      correo_electronico: record.correo_electronico,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    try {
+      const values = await form.validateFields();
+      await axios.put(
+        `http://localhost:4000/api/usuarios/${editingUser.id}`,
+        values
+      );
+      message.success("Usuario actualizado correctamente");
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === editingUser.id ? { ...u, ...values } : u
+        )
+      );
+      setIsModalOpen(false);
+    } catch (err) {
+      message.error(
+        err.response?.data?.error || "Error al actualizar el usuario"
+      );
+      console.error(err);
+    }
+  };
+
   const columns = [
     { title: "ID", dataIndex: "id", key: "id" },
     { title: "Nombre", dataIndex: "nombre", key: "nombre" },
     { title: "Apellido", dataIndex: "apellido", key: "apellido" },
-    { title: "Correo Electrónico", dataIndex: "correo_electronico", key: "correo_electronico" },
+    { title: "Correo", dataIndex: "correo_electronico", key: "correo_electronico" },
     {
       title: "Fecha de Creación",
       dataIndex: "createdAt",
       key: "createdAt",
-      render: (text) => new Date(text).toLocaleString()
+      render: (text) => new Date(text).toLocaleString(),
     },
     {
       title: "Acciones",
@@ -63,19 +110,27 @@ function UserManagement() {
           return <span style={{ color: "#888" }}>No permitido</span>;
         }
         return (
-          <Popconfirm
-            title={`¿Estás seguro de eliminar al usuario "${record.nombre} ${record.apellido}"?`}
-            onConfirm={() => handleDeleteUser(record.id)}
-            okText="Sí"
-            cancelText="No"
-          >
-            <Button type="primary" danger>
-              Eliminar
+          <>
+            <Button
+              style={{ marginRight: 8 }}
+              onClick={() => openEditModal(record)}
+            >
+              Editar
             </Button>
-          </Popconfirm>
+            <Popconfirm
+              title={`¿Eliminar a "${record.nombre} ${record.apellido}"?`}
+              onConfirm={() => handleDeleteUser(record.id)}
+              okText="Sí"
+              cancelText="No"
+            >
+              <Button type="primary" danger>
+                Eliminar
+              </Button>
+            </Popconfirm>
+          </>
         );
       },
-    }
+    },
   ];
 
   return (
@@ -106,6 +161,42 @@ function UserManagement() {
         </div>
       </Content>
       <AppFooter />
+
+      <Modal
+        title="Editar Usuario"
+        open={isModalOpen}
+        onOk={handleUpdateUser}
+        onCancel={() => setIsModalOpen(false)}
+        okText="Guardar"
+        cancelText="Cancelar"
+      >
+        <Form layout="vertical" form={form}>
+          <Form.Item
+            name="nombre"
+            label="Nombre"
+            rules={[{ required: true, message: "Ingrese el nombre" }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="apellido"
+            label="Apellido"
+            rules={[{ required: true, message: "Ingrese el apellido" }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="correo_electronico"
+            label="Correo Electrónico"
+            rules={[
+              { required: true, message: "Ingrese el correo" },
+              { type: "email", message: "Correo no válido" },
+            ]}
+          >
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Layout>
   );
 }
